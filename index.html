@@ -47,7 +47,7 @@
     <button id="go">ورود</button>
   </div>
 </div>
-<div class="screen" id="splash" hidden><div class="box"><img src="icon-192.png" alt=""></div></div>
+<div class="screen" id="splash" hidden><div class="box"><img src="icon-192.png" alt=""></div><div id="mode" style="position:absolute;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;font-size:13px;color:#86666C;direction:ltr"></div></div>
 <iframe id="app" title="خرید خونه‌مون"></iframe>
 <script>
   // ⬇️ Paste your Apps Script Web app URL here (ends with /exec)
@@ -106,6 +106,16 @@
     if (e.data.buylist === 'badkey') { setCode(''); askCode(true); }
     if (e.data.buylist === 'theme') onTheme(e.data);
   });
+
+  // which engine is running the app (shown small on the loading screen)
+  (function () {
+    const ua = navigator.userAgent;
+    const chrome = (ua.match(/Chrome\/(\d+)/) || [])[1] || '?';
+    const webview = /; wv\)/.test(ua);
+    const fromApp = document.referrer.indexOf('android-app://') === 0;
+    $('mode').textContent = webview ? 'WebView ' + chrome
+      : (fromApp ? 'Chrome TWA ' + chrome : 'Chrome ' + chrome) + (matchMedia('(display-mode: standalone)').matches ? ' · standalone' : '');
+  })();
 
   open();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
