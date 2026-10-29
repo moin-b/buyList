@@ -9,7 +9,7 @@
   try {
     var t = JSON.parse(localStorage.getItem('buylist-bar') || 'null');
     if (t && /^#[0-9a-f]{3,8}$/i.test(t.bar)) {
-      document.getElementById('tc').setAttribute('content', t.bar);
+      setBar(t.bar);
       document.documentElement.style.background = t.bg;
       document.documentElement.style.colorScheme = t.dark ? 'dark' : 'light';
     }
@@ -85,7 +85,21 @@
     }
   });
 
-  // status bar + background follow the theme chosen inside the app
+  // status bar + background follow the theme chosen inside the app.
+  // Chrome sometimes shows the previous theme-color instead of the newest one,
+  // so we set the color, then an invisible 1-step variant, then the color again:
+  // whichever of the last two Chrome shows, it looks the same.
+  let barTimer;
+  const tc = document.getElementById('tc');
+  const nudge = c => c.slice(0, -1) + (parseInt(c.slice(-1), 16) ^ 1).toString(16);
+  function setBar(c) {
+    clearTimeout(barTimer);
+    tc.setAttribute('content', c);
+    barTimer = setTimeout(() => {
+      tc.setAttribute('content', nudge(c));
+      barTimer = setTimeout(() => tc.setAttribute('content', c), 200);
+    }, 200);
+  }
   function applyBar(t) {
     document.getElementById('tc').setAttribute('content', t.bar);
     document.documentElement.style.colorScheme = t.dark ? 'dark' : 'light';
