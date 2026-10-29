@@ -6,9 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" id="tc" content="#6E2B37">
 <script>
-  // Chrome (in the installed app) reads the status bar color when the page loads
-  // and ignores later changes. So we set it here, before anything else, from the
-  // theme the app reported last time.
+  // Start with the status bar color of the theme used last time.
   var BAR = { bar: '#6E2B37', bg: '#FFF6F3' };
   try {
     var t = JSON.parse(localStorage.getItem('buylist-bar') || 'null');
@@ -78,25 +76,16 @@
   $('go').addEventListener('click', () => { const v = $('code').value.trim(); if (v) { setCode(v); open(); } });
   $('code').addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
 
-  // When the theme inside the app differs from the one this page loaded with,
-  // save it and reload once, so Chrome picks up the new status bar color.
+  // The app reports its theme; update the status bar color right away (no reload)
+  // and remember it, so the next launch starts with the right color.
   function onTheme(t) {
     const hex = /^#[0-9a-f]{3,8}$/i;
     if (!hex.test(t.bar || '') || !hex.test(t.bg || '')) return;
     const next = { bar: t.bar.toLowerCase(), bg: t.bg.toLowerCase() };
     $('tc').setAttribute('content', next.bar);
-    if (next.bar === BAR.bar.toLowerCase()) return;
-    try { localStorage.setItem('buylist-bar', JSON.stringify(next)); } catch (e) { return; }
-    // safety: never reload more than twice in 15 seconds
-    let n = 0, since = 0;
-    try { [n, since] = JSON.parse(sessionStorage.getItem('buylist-reloads') || '[0,0]'); } catch (e) {}
-    if (Date.now() - since > 15000) { n = 0; since = Date.now(); }
-    if (n >= 2) return;
-    try { sessionStorage.setItem('buylist-reloads', JSON.stringify([n + 1, since])); } catch (e) {}
     document.documentElement.style.background = next.bg;
     $('splash').style.background = next.bg;
-    $('splash').hidden = false; $('splash').classList.remove('gone');
-    location.reload();
+    try { localStorage.setItem('buylist-bar', JSON.stringify(next)); } catch (e) {}
   }
 
   window.addEventListener('message', e => {
