@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
 <meta name="theme-color" id="tc" content="#6E2B37">
 <script>
   // apply last theme before first paint, so the status bar is right from the start
@@ -11,7 +12,6 @@
     if (t && /^#[0-9a-f]{3,8}$/i.test(t.bar)) {
       setBar(t.bar);
       document.documentElement.style.background = t.bg;
-      document.documentElement.style.colorScheme = t.dark ? 'dark' : 'light';
     }
   } catch (e) {}
 </script>
@@ -102,7 +102,6 @@
   }
   function applyBar(t) {
     document.getElementById('tc').setAttribute('content', t.bar);
-    document.documentElement.style.colorScheme = t.dark ? 'dark' : 'light';
     document.documentElement.style.background = document.body.style.background = t.bg;
     $('splash').style.background = t.bg;
   }
