@@ -6,24 +6,27 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" id="tc" content="#6E2B37">
 <script>
-  // apply last theme before first paint, so the status bar is right from the start
+  // Chrome (in the installed app) reads the status bar color when the page loads
+  // and ignores later changes. So we set it here, before anything else, from the
+  // theme the app reported last time.
+  var BAR = { bar: '#6E2B37', bg: '#FFF6F3' };
   try {
     var t = JSON.parse(localStorage.getItem('buylist-bar') || 'null');
-    if (t && /^#[0-9a-f]{3,8}$/i.test(t.bar)) {
-      setBar(t.bar);
-      document.documentElement.style.background = t.bg;
-    }
+    if (t && /^#[0-9a-f]{3,8}$/i.test(t.bar) && /^#[0-9a-f]{3,8}$/i.test(t.bg)) BAR = t;
   } catch (e) {}
+  document.getElementById('tc').setAttribute('content', BAR.bar);
+  document.documentElement.style.background = BAR.bg;
 </script>
 <title>خرید خونه‌مون</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-32.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <style>
-  html, body { margin: 0; height: 100%; background: #FFF6F3; overflow: hidden; font-family: Tahoma, sans-serif; color: #3A1F25; }
-  iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: #FFF6F3; }
-  .screen { position: fixed; inset: 0; display: grid; place-items: center; background: #FFF6F3; z-index: 2; transition: opacity .3s; padding: 24px; box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: Tahoma, sans-serif; color: #3A1F25; }
+  iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+  .screen { position: fixed; inset: 0; display: grid; place-items: center; z-index: 2; transition: opacity .3s; padding: 24px; box-sizing: border-box; }
   .screen.gone { opacity: 0; pointer-events: none; }
+  #login { background: #FFF6F3; }
   .box { text-align: center; width: 100%; max-width: 300px; }
   .box img { width: 112px; height: 112px; }
   .box h1 { font-size: 20px; margin: 12px 0 4px; }
@@ -48,12 +51,13 @@
 <iframe id="app" title="خرید خونه‌مون"></iframe>
 <script>
   // ⬇️ Paste your Apps Script Web app URL here (ends with /exec)
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwt3IAaFwDFHpJ0trEgdCjUKm4f66ovk5zPS-Ao83-rqTbal9HxGLgCKufXMQKHyjDO/exec';
+  const SCRIPT_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
 
   const $ = id => document.getElementById(id);
   const STORE = 'buylist-code';
   const getCode = () => { try { return localStorage.getItem(STORE) || ''; } catch (e) { return ''; } };
   const setCode = v => { try { v ? localStorage.setItem(STORE, v) : localStorage.removeItem(STORE); } catch (e) {} };
+  $('splash').style.background = BAR.bg;
 
   function askCode(error) {
     $('app').removeAttribute('src');
@@ -74,38 +78,34 @@
   $('go').addEventListener('click', () => { const v = $('code').value.trim(); if (v) { setCode(v); open(); } });
   $('code').addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
 
-  // the app tells us when the passcode is wrong
+  // When the theme inside the app differs from the one this page loaded with,
+  // save it and reload once, so Chrome picks up the new status bar color.
+  function onTheme(t) {
+    const hex = /^#[0-9a-f]{3,8}$/i;
+    if (!hex.test(t.bar || '') || !hex.test(t.bg || '')) return;
+    const next = { bar: t.bar.toLowerCase(), bg: t.bg.toLowerCase() };
+    $('tc').setAttribute('content', next.bar);
+    if (next.bar === BAR.bar.toLowerCase()) return;
+    try { localStorage.setItem('buylist-bar', JSON.stringify(next)); } catch (e) { return; }
+    // safety: never reload more than twice in 15 seconds
+    let n = 0, since = 0;
+    try { [n, since] = JSON.parse(sessionStorage.getItem('buylist-reloads') || '[0,0]'); } catch (e) {}
+    if (Date.now() - since > 15000) { n = 0; since = Date.now(); }
+    if (n >= 2) return;
+    try { sessionStorage.setItem('buylist-reloads', JSON.stringify([n + 1, since])); } catch (e) {}
+    document.documentElement.style.background = next.bg;
+    $('splash').style.background = next.bg;
+    $('splash').hidden = false; $('splash').classList.remove('gone');
+    location.reload();
+  }
+
   window.addEventListener('message', e => {
     let host = ''; try { host = new URL(e.origin).hostname; } catch (x) { return; }
     if (!host.endsWith('.googleusercontent.com') && host !== 'script.google.com') return;
-    if (e.data && e.data.buylist === 'badkey') { setCode(''); askCode(true); }
-    if (e.data && e.data.buylist === 'theme' && /^#[0-9a-f]{3,8}$/i.test(e.data.bar || '') && /^#[0-9a-f]{3,8}$/i.test(e.data.bg || '')) {
-      applyBar(e.data);
-      try { localStorage.setItem('buylist-bar', JSON.stringify({bar: e.data.bar, bg: e.data.bg, dark: !!e.data.dark})); } catch (x) {}
-    }
+    if (!e.data) return;
+    if (e.data.buylist === 'badkey') { setCode(''); askCode(true); }
+    if (e.data.buylist === 'theme') onTheme(e.data);
   });
-
-  // status bar + background follow the theme chosen inside the app.
-  // Chrome sometimes shows the previous theme-color instead of the newest one,
-  // so we set the color, then an invisible 1-step variant, then the color again:
-  // whichever of the last two Chrome shows, it looks the same.
-  let barTimer;
-  const tc = document.getElementById('tc');
-  const nudge = c => c.slice(0, -1) + (parseInt(c.slice(-1), 16) ^ 1).toString(16);
-  function setBar(c) {
-    clearTimeout(barTimer);
-    tc.setAttribute('content', c);
-    barTimer = setTimeout(() => {
-      tc.setAttribute('content', nudge(c));
-      barTimer = setTimeout(() => tc.setAttribute('content', c), 200);
-    }, 200);
-  }
-  function applyBar(t) {
-    document.getElementById('tc').setAttribute('content', t.bar);
-    document.documentElement.style.background = document.body.style.background = t.bg;
-    $('splash').style.background = t.bg;
-  }
-  try { const t = JSON.parse(localStorage.getItem('buylist-bar') || 'null'); if (t) applyBar(t); } catch (e) {}
 
   open();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
