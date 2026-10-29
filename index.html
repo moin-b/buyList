@@ -3,38 +3,74 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0E6F6C">
+<meta name="theme-color" content="#6E2B37">
 <title>خرید خونه‌مون</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-32.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <style>
-  html, body { margin: 0; height: 100%; background: #FFF6F3; overflow: hidden; }
-  iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: #EEF2EF; }
-  #splash { position: fixed; inset: 0; display: grid; place-items: center; background: #FFF6F3; color: #6E2B37;
-            font-family: Tahoma, sans-serif; transition: opacity .3s; z-index: 2; }
-  #splash img { width: 112px; height: 112px; }
-  #splash a { display: none; margin-top: 18px; color: #6E2B37; font-size: 15px; }
-  #splash.slow a { display: block; }
-  #splash.gone { opacity: 0; pointer-events: none; }
-  .box { text-align: center; }
+  html, body { margin: 0; height: 100%; background: #FFF6F3; overflow: hidden; font-family: Tahoma, sans-serif; color: #3A1F25; }
+  iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: #FFF6F3; }
+  .screen { position: fixed; inset: 0; display: grid; place-items: center; background: #FFF6F3; z-index: 2; transition: opacity .3s; padding: 24px; box-sizing: border-box; }
+  .screen.gone { opacity: 0; pointer-events: none; }
+  .box { text-align: center; width: 100%; max-width: 300px; }
+  .box img { width: 112px; height: 112px; }
+  .box h1 { font-size: 20px; margin: 12px 0 4px; }
+  .box p { margin: 0 0 16px; font-size: 14px; color: #86666C; }
+  .box input { width: 100%; box-sizing: border-box; padding: 12px; font-size: 18px; text-align: center; border: 1px solid #F0DCD7; border-radius: 12px; background: #fff; color: #3A1F25; }
+  .box button { width: 100%; margin-top: 10px; padding: 12px; font-size: 16px; font-weight: bold; border: 0; border-radius: 12px; background: #C8463F; color: #fff; }
+  .err { color: #A3182B !important; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<div id="splash"><div class="box">
-  <img src="icon-192.png" alt="">
-  <a id="direct" href="#">باز نشد؟ اینجا بزن</a>
-</div></div>
-<iframe id="app" title="خرید خونه‌مون" allow="clipboard-write"></iframe>
+<div class="screen" id="login" hidden>
+  <div class="box">
+    <img src="icon-192.png" alt="">
+    <h1>خرید خونه‌مون</h1>
+    <p id="msg">رمز را وارد کن (فقط یک بار)</p>
+    <input id="code" type="password" autocomplete="current-password">
+    <button id="go">ورود</button>
+  </div>
+</div>
+<div class="screen" id="splash" hidden><div class="box"><img src="icon-192.png" alt=""></div></div>
+<iframe id="app" title="خرید خونه‌مون"></iframe>
 <script>
   // ⬇️ Paste your Apps Script Web app URL here (ends with /exec)
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwJcUrY33DoYUXL9i8_Oxc-6bIzEuo-Z6jQbM7aN-ZAlk1Jl1O0xQeSxbrJRGX8Ohsq/exec';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwt3IAaFwDFHpJ0trEgdCjUKm4f66ovk5zPS-Ao83-rqTbal9HxGLgCKufXMQKHyjDO/exec';
 
-  const frame = document.getElementById('app'), splash = document.getElementById('splash');
-  document.getElementById('direct').href = SCRIPT_URL;
-  frame.addEventListener('load', () => splash.classList.add('gone'));
-  setTimeout(() => splash.classList.add('slow'), 10000);
-  frame.src = SCRIPT_URL;
+  const $ = id => document.getElementById(id);
+  const STORE = 'buylist-code';
+  const getCode = () => { try { return localStorage.getItem(STORE) || ''; } catch (e) { return ''; } };
+  const setCode = v => { try { v ? localStorage.setItem(STORE, v) : localStorage.removeItem(STORE); } catch (e) {} };
+
+  function askCode(error) {
+    $('app').removeAttribute('src');
+    $('splash').hidden = true;
+    $('login').hidden = false; $('login').classList.remove('gone');
+    $('msg').textContent = error ? 'رمز اشتباه بود؛ دوباره وارد کن' : 'رمز را وارد کن (فقط یک بار)';
+    $('msg').classList.toggle('err', !!error);
+    $('code').value = ''; setTimeout(() => $('code').focus(), 100);
+  }
+  function open() {
+    const code = getCode();
+    if (!code) return askCode(false);
+    $('login').hidden = true;
+    $('splash').hidden = false; $('splash').classList.remove('gone');
+    $('app').src = SCRIPT_URL + '?k=' + encodeURIComponent(code);
+  }
+  $('app').addEventListener('load', () => { if ($('app').getAttribute('src')) $('splash').classList.add('gone'); });
+  $('go').addEventListener('click', () => { const v = $('code').value.trim(); if (v) { setCode(v); open(); } });
+  $('code').addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
+
+  // the app tells us when the passcode is wrong
+  window.addEventListener('message', e => {
+    let host = ''; try { host = new URL(e.origin).hostname; } catch (x) { return; }
+    if (!host.endsWith('.googleusercontent.com') && host !== 'script.google.com') return;
+    if (e.data && e.data.buylist === 'badkey') { setCode(''); askCode(true); }
+  });
+
+  open();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
